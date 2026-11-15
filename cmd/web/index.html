@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snack Counter</title>
+<style>
+:root {
+  --bg: #f4f5f8; --panel: #ffffff; --panel-2: #f8f9fb; --text: #18202a; --muted: #687384; --faint: #9aa3b0;
+  --line: #e4e7ec; --accent: #3b5bdb; --accent-soft: #edf1ff; --accent-text: #ffffff;
+  --ok: #1e8e4e; --ok-soft: #e6f5ec; --warn: #b8690a; --warn-soft: #fdf3e3; --bad: #c9362b; --bad-soft: #fdecea;
+  --open: #3b5bdb; --committed: #7c4ddb; --purchased: #b8690a; --submitted: #0e7f8f; --reimbursed: #1e8e4e; --rejected: #c9362b;
+  --shadow: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.06);
+  --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216; --panel: #181c22; --panel-2: #1e232a; --text: #e7eaef; --muted: #9aa4b2; --faint: #6b7583;
+    --line: #2a3039; --accent: #7b96ff; --accent-soft: #1d2540; --accent-text: #0c1222;
+    --ok: #4cc681; --ok-soft: #16271d; --warn: #eaa64a; --warn-soft: #2b2214; --bad: #ff7468; --bad-soft: #2f1a19;
+    --open: #7b96ff; --committed: #b08cff; --purchased: #eaa64a; --submitted: #4ccad9; --reimbursed: #4cc681; --rejected: #ff7468;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.muted { color: var(--muted); } .faint { color: var(--faint); } .small { font-size: 12.5px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* buttons & inputs */
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--faint); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.07); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+.btn.ghost:hover { background: var(--panel-2); color: var(--text); }
+.btn.danger { color: var(--bad); }
+.btn.ok { color: var(--ok); }
+.btn.sm { padding: 3px 9px; font-size: 12.5px; }
+select, input[type=text], input[type=month] { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 9px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.seg button { border: 0; background: transparent; padding: 5px 10px; cursor: pointer; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button:hover { background: var(--panel-2); }
+.seg button[aria-pressed=true] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+/* top bar */
+.top { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); }
+.top-inner { max-width: 1400px; margin: 0 auto; padding: 10px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; }
+.brand { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.brand .logo { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); color: var(--accent-text); display: grid; place-items: center; font-size: 15px; }
+.clock { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.clock .main { font-weight: 700; font-size: 15px; }
+.clock .tz { color: var(--muted); font-size: 12.5px; }
+.clock .tz b { color: var(--text); font-weight: 600; }
+.spacer { flex: 1; }
+.switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.switch input { appearance: none; width: 34px; height: 20px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background .15s; margin: 0; }
+.switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: var(--shadow); }
+.switch input:checked { background: var(--bad); }
+.switch input:checked::after { left: 16px; }
+
+/* layout */
+.layout { max-width: 1400px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; overflow-x: auto; }
+.tab { border: 0; background: none; padding: 9px 14px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+.tab:hover { color: var(--text); }
+.tab[aria-selected=true] { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+.count { background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; font-size: 11px; padding: 0 7px; color: var(--muted); }
+.count.hot { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.panel { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.pad { padding: 16px; }
+h2 { font-size: 15px; margin: 0; }
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+
+/* offices */
+.offices { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 760px) { .offices { grid-template-columns: minmax(0, 1fr); } }
+.office-head { padding: 16px 16px 12px; border-bottom: 1px solid var(--line); }
+.office-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.office-title h3 { margin: 0; font-size: 18px; }
+.tag { font-size: 11.5px; padding: 1px 8px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); }
+.budget { margin-top: 10px; }
+.budget-row { display: flex; flex-wrap: wrap; gap: 0 8px; justify-content: space-between; font-size: 12.5px; color: var(--muted); }
+.budget-row b { color: var(--text); }
+.bar { height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; margin: 6px 0 2px; }
+.bar > i { display: block; height: 100%; background: var(--ok); border-radius: 999px; transition: width .3s; }
+.bar > i.warn { background: var(--warn); } .bar > i.bad { background: var(--bad); }
+.here { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 12.5px; }
+.avatar { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; text-transform: uppercase; flex: none; }
+.office-body { padding: 16px; display: grid; gap: 12px; }
+.idle { text-align: center; padding: 18px 8px; border: 1px dashed var(--line); border-radius: 10px; }
+.idle .big { font-size: 28px; }
+.idle p { margin: 4px 0 12px; }
+.inline { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center; }
+
+/* refill card */
+.refill { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.refill-top { padding: 12px 12px 10px; }
+.refill-id { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.badge { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; color: #fff; text-transform: capitalize; }
+.s-open { background: var(--open); } .s-committed { background: var(--committed); } .s-purchased { background: var(--purchased); }
+.s-submitted { background: var(--submitted); } .s-reimbursed { background: var(--reimbursed); } .s-rejected { background: var(--rejected); }
+.stepper { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 12px 0 4px; }
+.stepper div { height: 4px; border-radius: 999px; background: var(--line); }
+.stepper div.done { background: var(--accent); }
+.stepper div.bad { background: var(--bad); }
+.steplabels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; font-size: 11px; color: var(--faint); }
+.steplabels span.on { color: var(--text); font-weight: 600; }
+.headline { margin: 10px 0 0; }
+.tried { margin-top: 6px; font-size: 12px; color: var(--muted); }
+.refill-actions { background: var(--panel-2); border-top: 1px solid var(--line); padding: 10px 12px; display: grid; gap: 8px; }
+.act-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.receipt { display: grid; grid-template-columns: 1fr 90px; gap: 6px; }
+.receipt .full { grid-column: 1 / -1; }
+.receipt input[type=text] { width: 100%; }
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.pending-list { display: grid; gap: 6px; }
+.pending-item { display: flex; align-items: center; gap: 8px; justify-content: space-between; padding: 8px 10px; border-radius: 8px; background: var(--panel-2); font-size: 12.5px; }
+.label { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); font-weight: 600; }
+
+/* tables */
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+td.r, th.r { text-align: right; }
+.chip { display: inline-block; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; margin: 1px 3px 1px 0; font-size: 12px; }
+.empty { padding: 28px; text-align: center; color: var(--muted); }
+.banner { padding: 10px 14px; border-radius: 10px; background: var(--bad-soft); color: var(--bad); margin-bottom: 12px; font-size: 13px; }
+
+/* report */
+.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+@media (max-width: 760px) { .kpis { grid-template-columns: 1fr; } }
+.kpi { padding: 14px 16px; }
+.kpi .v { font-size: 22px; font-weight: 700; margin-top: 2px; }
+
+/* feed */
+.feed { position: sticky; top: 74px; max-height: calc(100vh - 90px); display: flex; flex-direction: column; }
+@media (max-width: 1000px) { .feed { position: static; max-height: 560px; } }
+.feed-head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.feed-list { overflow-y: auto; padding: 8px; display: grid; gap: 2px; align-content: start; }
+.msg { display: grid; grid-template-columns: 26px 1fr; gap: 8px; padding: 8px; border-radius: 8px; }
+.msg:hover { background: var(--panel-2); }
+.msg .icon { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+.msg .icon.ch { background: var(--ok-soft); color: var(--ok); }
+.msg .meta { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 6px; }
+.msg .meta b { color: var(--text); }
+.msg .text { margin-top: 1px; font-size: 13px; }
+.msg.fresh { animation: fresh 1.6s ease-out; }
+@keyframes fresh { from { background: var(--accent-soft); } to { background: transparent; } }
+
+/* toast & dialog */
+#toast { position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; transition: all .2s; background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; max-width: min(640px, calc(100vw - 32px)); box-shadow: 0 8px 24px rgba(0,0,0,.18); z-index: 20; font-size: 13.5px; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+#toast.err { background: var(--bad); color: #fff; }
+dialog { border: 1px solid var(--line); border-radius: 14px; padding: 0; max-width: 560px; width: calc(100vw - 32px); background: var(--panel); color: var(--text); }
+dialog::backdrop { background: rgba(10,14,20,.45); }
+.dlg-head { padding: 16px 18px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+.dlg-body { padding: 8px 18px 18px; }
+.guide { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.guide li { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.guide b { display: block; margin-bottom: 2px; }
+.hidden { display: none !important; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand"><span class="logo" aria-hidden="true">🍪</span> Snack Counter</div>
+    <div class="clock" aria-live="polite">
+      <span class="main num" id="now"></span>
+      <span class="tz">Oslo <b class="num" id="nowOslo"></b></span>
+      <span class="tz">Bengaluru <b class="num" id="nowBlr"></b></span>
+    </div>
+    <div class="seg" role="group" aria-label="Advance simulated time">
+      <button data-min="15">+15m</button><button data-min="60">+1h</button><button data-min="120">+2h</button>
+      <button data-min="1440">+1d</button><button data-min="7200">+5d</button>
+    </div>
+    <div class="spacer"></div>
+    <label class="switch small"><input type="checkbox" id="hrdown"> HR down</label>
+    <button class="btn ghost" id="help">How to demo</button>
+    <button class="btn ghost danger" id="reset">Reset</button>
+  </div>
+</header>
+
+<div class="layout">
+  <main>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button class="tab" role="tab" data-tab="counters">Counters <span class="count" id="c-counters"></span></button>
+      <button class="tab" role="tab" data-tab="people">People</button>
+      <button class="tab" role="tab" data-tab="hr">HR claims <span class="count" id="c-hr"></span></button>
+      <button class="tab" role="tab" data-tab="history">History <span class="count" id="c-history"></span></button>
+      <button class="tab" role="tab" data-tab="report">Monthly report</button>
+    </nav>
+
+    <section data-panel="counters" role="tabpanel"><div class="offices" id="offices"></div></section>
+
+    <section data-panel="people" role="tabpanel" class="panel">
+      <div class="pad section-head" style="margin:0;padding-bottom:0">
+        <h2>Where is everyone today?</h2>
+        <span class="small muted">Only volunteers physically at an office are asked to refill it.</span>
+      </div>
+      <div class="tablewrap pad"><table id="people"></table></div>
+    </section>
+
+    <section data-panel="hr" role="tabpanel">
+      <div id="hrBanner" class="banner hidden">HR system is down. New claims wait in <b>purchased</b> and are retried on every tick.</div>
+      <div class="panel">
+        <div class="pad section-head" style="margin:0;padding-bottom:0">
+          <h2>Claims in the HR system</h2>
+          <span class="small muted">Approving here only changes HR. The bot notices on the next clock tick.</span>
+        </div>
+        <div class="tablewrap pad"><table id="claims"></table></div>
+      </div>
+    </section>
+
+    <section data-panel="history" role="tabpanel" class="panel">
+      <div class="tablewrap pad"><table id="refills"></table></div>
+    </section>
+
+    <section data-panel="report" role="tabpanel">
+      <div class="section-head">
+        <label class="act-row">Month <input type="month" id="month"></label>
+        <span class="small muted">Totals in NOK · rate 1 INR = 0.125 NOK</span>
+      </div>
+      <div id="reportBody"></div>
+    </section>
+  </main>
+
+  <aside class="panel feed" aria-label="Chat activity">
+    <div class="feed-head">
+      <h2>Chat activity</h2>
+      <div class="seg small" role="group" aria-label="Filter messages">
+        <button data-feed="all">All</button><button data-feed="dm">DMs</button><button data-feed="ch">Channels</button>
+      </div>
+    </div>
+    <div class="feed-list" id="chat"></div>
+  </aside>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<dialog id="guide">
+  <div class="dlg-head"><h2>How to demo each rule</h2><button class="btn ghost" id="closeGuide" aria-label="Close">✕</button></div>
+  <div class="dlg-body">
+    <ol class="guide small">
+      <li><b>Happy path</b>Report empty → Accept → Submit receipt → HR claims tab: Approve → +15m.</li>
+      <li><b>Nobody answers</b>Report empty → +2h (offer moves on) → Accept → +1d (released, handed to the next person).</li>
+      <li><b>No double buying</b>Report empty twice: still one refill. Decline until it's broadcast, then "Everyone clicks accept".</li>
+      <li><b>Visitor</b>People tab: move priya to Oslo and the Oslo people away. priya gets the Oslo refill and claims in NOK.</li>
+      <li><b>Budget</b>Submit a few receipts and watch the cap shrink. Try 9999, 0, the wrong currency or no image.</li>
+      <li><b>HR outage</b>Switch on "HR down" before submitting, +1d (nothing is lost or reassigned), switch it off, +15m.</li>
+      <li><b>Time zones</b>Late on the last day of a month (UTC), Bengaluru is already in the next month. Check the report.</li>
+    </ol>
+  </div>
+</dialog>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = (m, c) => `${(m / 100).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${c}`;
+const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+const COLORS = ['#3b5bdb', '#7c4ddb', '#0e7f8f', '#c2410c', '#1e8e4e', '#be185d', '#4d7c0f'];
+const avatar = n => `<span class="avatar" style="background:${COLORS[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length]}" title="${esc(n)}">${esc(n[0] || '?')}</span>`;
+const ACTIVE = ['open', 'committed'], IN_HR = ['purchased', 'submitted'];
+
+let S = null, month = '', tab = store.get('tab', 'counters'), feed = store.get('feed', 'all'), seenChat = 0, toastTimer;
+
+async function call(url, body) {
+  try {
+    const q = month ? `?month=${encodeURIComponent(month)}` : '';
+    const r = await fetch(url + q, body ? { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) } : {});
+    render(await r.json());
+  } catch (e) { toast('Server not reachable: ' + e.message, true); }
+}
+const act = body => call('/api/do', body);
+
+function toast(msg, err) {
+  const t = $('#toast'); t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = '', err ? 6000 : 3500);
+}
+
+function render(resp) {
+  if (resp.error) toast(resp.error, true); else if (resp.info) toast(resp.info);
+  S = resp.state;
+  $('#now').textContent = S.now; $('#nowOslo').textContent = S.nowOslo; $('#nowBlr').textContent = S.nowBlr;
+  $('#hrdown').checked = S.hrDown;
+  if (!month) $('#month').value = S.month;
+  const active = S.refills.filter(r => ACTIVE.includes(r.state)).length;
+  const pending = S.claims.filter(c => c.status === 'pending').length;
+  setCount('#c-counters', active, active > 0); setCount('#c-hr', pending, pending > 0); setCount('#c-history', S.refills.length, false);
+  renderOffices(); renderPeople(); renderClaims(); renderHistory(); renderReport(); renderChat(); showTab();
+}
+function setCount(sel, n, hot) { const el = $(sel); el.textContent = n; el.className = 'count' + (hot ? ' hot' : ''); el.classList.toggle('hidden', !n); }
+
+function showTab() {
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === tab));
+  document.querySelectorAll('[data-panel]').forEach(p => p.classList.toggle('hidden', p.dataset.panel !== tab));
+  document.querySelectorAll('[data-feed]').forEach(b => b.setAttribute('aria-pressed', b.dataset.feed === feed));
+}
+
+const opts = sel => S.people.map(p => `<option ${p.name === sel ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+
+function renderOffices() {
+  const rep = S.report ? Object.fromEntries(S.report.Offices.map(o => [o.Office, o])) : {};
+  $('#offices').innerHTML = [['Oslo', 'NOK', S.nowOslo], ['Bengaluru', 'INR', S.nowBlr]].map(([office, cur, local]) => {
+    const o = rep[office];
+    const pct = o ? Math.min(100, Math.round(o.Spent / o.Budget * 100)) : 0;
+    const here = S.people.filter(p => p.at === office);
+    const current = S.refills.find(r => r.office === office && ACTIVE.includes(r.state));
+    const inHR = S.refills.filter(r => r.office === office && IN_HR.includes(r.state));
+    return `<div class="panel">
+      <div class="office-head">
+        <div class="office-title"><h3>${office}</h3><span class="tag">${cur} · ${esc(local.split(' ').slice(2).join(' '))}</span></div>
+        ${o ? `<div class="budget">
+          <div class="budget-row"><span>Budget ${esc(S.report.Month)}</span><span><b>${money(o.Spent, cur)}</b> / ${money(o.Budget, cur)}</span></div>
+          <div class="bar" role="progressbar" aria-label="${office} budget used" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i class="${pct >= 100 ? 'bad' : pct >= 80 ? 'warn' : ''}" style="width:${pct}%"></i></div>
+          <div class="budget-row"><span>${pct}% used</span><span>${money(o.Remaining, cur)} left</span></div></div>` : ''}
+        <div class="here"><span class="muted">At the office today:</span> ${here.length ? here.map(p => avatar(p.name)).join('') : '<span class="faint">nobody</span>'}</div>
+      </div>
+      <div class="office-body">
+        ${current ? refillCard(current) : idle(office, here)}
+        ${inHR.length ? `<div><div class="label" style="margin-bottom:6px">Being reimbursed</div><div class="pending-list">${inHR.map(r => `
+          <div class="pending-item"><span>${avatar(r.assignee)} <b>${esc(r.assignee)}</b> · ${money(r.amount, r.currency)}</span>
+          <span><span class="badge s-${r.state}">${r.state === 'purchased' ? 'HR retry' : 'with HR'}</span></span></div>`).join('')}</div></div>` : ''}
+      </div></div>`;
+  }).join('');
+}
+
+function idle(office, here) {
+  return `<div class="idle">
+    <div class="big" aria-hidden="true">✅</div>
+    <p class="muted">Box is stocked. Nothing in progress.</p>
+    <div class="inline"><span class="small muted">Reported by</span>
+      <select id="rep-${office}" aria-label="Reporter">${opts(here[0]?.name)}</select>
+      <button class="btn primary" data-report="${office}">Report box empty</button></div></div>`;
+}
+
+const STEPS = ['Find buyer', 'Buying', 'Receipt', 'With HR', 'Paid'];
+const stepOf = { open: 0, committed: 1, purchased: 2, submitted: 3, reimbursed: 4, rejected: 4 };
+
+function refillCard(r) {
+  const at = stepOf[r.state];
+  const stepper = `<div class="stepper">${STEPS.map((_, i) => `<div class="${i < at ? 'done' : i === at ? (r.state === 'rejected' ? 'bad' : 'done') : ''}"></div>`).join('')}</div>
+    <div class="steplabels">${STEPS.map((s, i) => `<span class="${i === at ? 'on' : ''}">${s}</span>`).join('')}</div>`;
+  let headline, actions;
+  if (r.state === 'open' && r.broadcast) {
+    headline = `📣 Nobody available. <b>Anyone at ${esc(r.office)}</b> can claim it. A new round starts ${esc(r.offerDeadline)}.`;
+  } else if (r.state === 'open') {
+    headline = `Waiting for ${avatar(r.offeredTo)} <b>${esc(r.offeredTo)}</b> to answer · expires ${esc(r.offerDeadline)}`;
+  } else {
+    headline = `${avatar(r.assignee)} <b>${esc(r.assignee)}</b> is buying · cap <b>${money(r.cap, r.currency)}</b> · receipt due ${esc(r.commitDeadline)}`;
+  }
+  if (r.state === 'open') {
+    actions = `<div class="act-row"><span class="small muted">Act as</span><select id="who-${r.id}" aria-label="Act as">${opts(r.offeredTo || S.people.find(p => p.at === r.office)?.name)}</select>
+        <button class="btn primary" data-op="commit" data-id="${r.id}">${r.broadcast ? 'Claim' : 'Accept'}</button>
+        ${r.broadcast ? '' : `<button class="btn" data-op="decline" data-id="${r.id}">Decline</button>`}</div>
+      <div class="act-row"><button class="btn sm ghost" data-op="race" data-id="${r.id}">⚡ Everyone here clicks accept at once</button>
+        <button class="btn sm ghost" data-report="${esc(r.office)}" data-again="1">Report empty again</button></div>`;
+  } else {
+    const def = r.currency === 'NOK' ? 85000 : 200000;
+    actions = `<div class="receipt">
+        <input type="text" id="amt-${r.id}" aria-label="Amount" inputmode="decimal" value="${(Math.min(r.cap, def) / 100).toFixed(2)}">
+        <select id="cur-${r.id}" aria-label="Currency"><option ${r.currency === 'NOK' ? 'selected' : ''}>NOK</option><option ${r.currency === 'INR' ? 'selected' : ''}>INR</option></select>
+        <input class="full" type="text" id="items-${r.id}" aria-label="Items bought" placeholder="Items, comma separated" value="chips, fruit">
+      </div>
+      <div class="act-row"><label class="check"><input type="checkbox" id="img-${r.id}" checked> Receipt photo attached</label></div>
+      <div class="act-row"><span class="small muted">Act as</span><select id="who-${r.id}" aria-label="Act as">${opts(r.assignee)}</select>
+        <button class="btn primary" data-op="submit" data-id="${r.id}">Submit receipt</button>
+        <button class="btn danger" data-op="release" data-id="${r.id}">Release</button></div>`;
+  }
+  return `<div class="refill">
+    <div class="refill-top">
+      <div class="refill-id"><span><b>Refill ${esc(r.id)}</b> <span class="faint small">reported by ${esc(r.reportedBy)}</span></span><span class="badge s-${r.state}">${r.state}</span></div>
+      ${stepper}
+      <p class="headline">${headline}</p>
+      ${r.tried?.length ? `<div class="tried">Asked so far: ${r.tried.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : ''}
+    </div>
+    <div class="refill-actions">${actions}</div></div>`;
+}
+
+function renderPeople() {
+  const places = [['Oslo', 'Oslo'], ['Bengaluru', 'Bengaluru'], ['', 'Away']];
+  $('#people').innerHTML = `<tr><th>Volunteer</th><th>Home office</th><th>Today</th></tr>` + S.people.map(p => `<tr>
+    <td>${avatar(p.name)} &nbsp;<b>${esc(p.name)}</b></td>
+    <td class="muted">${esc(p.home)}${p.at && p.at !== p.home ? ' <span class="chip">visiting ' + esc(p.at) + '</span>' : ''}</td>
+    <td><div class="seg small" role="group" aria-label="Location of ${esc(p.name)}">${places.map(([v, l]) =>
+      `<button data-locate="${esc(p.name)}" data-office="${v}" aria-pressed="${p.at === v}">${l}</button>`).join('')}</div></td></tr>`).join('');
+}
+
+function renderClaims() {
+  $('#hrBanner').classList.toggle('hidden', !S.hrDown);
+  if (!S.claims.length) { $('#claims').innerHTML = `<tr><td class="empty">No claims yet. They appear when a receipt is submitted.</td></tr>`; return; }
+  const cls = { pending: 's-submitted', approved: 's-reimbursed', rejected: 's-rejected' };
+  $('#claims').innerHTML = `<tr><th>Claim</th><th>Employee</th><th class="r">Amount</th><th>Description</th><th>Status</th><th></th></tr>` +
+    S.claims.slice().reverse().map(c => `<tr>
+      <td><b>${esc(c.id)}</b></td><td>${avatar(c.employee)} ${esc(c.employee)}</td><td class="r num">${money(c.amount, c.currency)}</td>
+      <td class="small muted">${esc(c.description)}</td>
+      <td>${cls[c.status] ? `<span class="badge ${cls[c.status]}">${c.status}</span>` : `<span class="faint small">${esc(c.status)}</span>`}</td>
+      <td class="r">${c.status === 'pending' ? `<button class="btn sm ok" data-decide="${c.id}" data-approve="1">Approve</button> <button class="btn sm danger" data-decide="${c.id}" data-approve="0">Reject</button>` : ''}</td></tr>`).join('');
+}
+
+function renderHistory() {
+  if (!S.refills.length) { $('#refills').innerHTML = `<tr><td class="empty">No refills yet.</td></tr>`; return; }
+  $('#refills').innerHTML = `<tr><th>Refill</th><th>Office</th><th>Month</th><th>Status</th><th>Person</th><th class="r">Amount</th><th>Items</th><th>Claim</th></tr>` +
+    S.refills.slice().reverse().map(r => {
+      const who = r.assignee || r.offeredTo;
+      return `<tr><td><b>${esc(r.id)}</b></td><td>${esc(r.office)}</td><td class="muted">${esc(r.month)}</td>
+      <td><span class="badge s-${r.state}">${r.state}</span></td>
+      <td>${who ? avatar(who) + ' ' + esc(who) : r.broadcast ? '<span class="faint">broadcast</span>' : ''}</td>
+      <td class="r num">${r.amount ? money(r.amount, r.currency) : ''}</td>
+      <td>${(r.items || []).map(i => `<span class="chip">${esc(i)}</span>`).join('')}</td><td class="muted">${esc(r.claimId)}</td></tr>`;
+    }).join('');
+}
+
+function renderReport() {
+  if (!S.report) { $('#reportBody').innerHTML = `<div class="panel empty">${esc(S.reportError)}</div>`; return; }
+  const R = S.report;
+  const kpi = (label, v, sub) => `<div class="panel kpi"><div class="label">${label}</div><div class="v num">${v}</div><div class="small muted">${sub}</div></div>`;
+  const kpis = R.Offices.map(o => kpi(o.Office, money(o.Spent, o.Currency), `of ${money(o.Budget, o.Currency)} · ${o.Refills} refill${o.Refills === 1 ? '' : 's'}`)).join('')
+    + kpi('Total, both offices', money(R.Total, 'NOK'), `for ${esc(R.Month)}`);
+  const chips = m => Object.entries(m || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<span class="chip">${esc(k)} ×${v}</span>`).join('') || '<span class="faint">—</span>';
+  $('#reportBody').innerHTML = `<div class="kpis">${kpis}</div><div class="panel"><div class="tablewrap pad"><table>
+    <tr><th>Office</th><th class="r">Spent</th><th class="r">Left</th><th class="r">In NOK</th><th>Refills by</th><th>Snacks bought</th></tr>
+    ${R.Offices.map(o => `<tr><td><b>${esc(o.Office)}</b></td><td class="r num">${money(o.Spent, o.Currency)}</td><td class="r num">${money(o.Remaining, o.Currency)}</td>
+      <td class="r num">${money(o.SpentInReportCurrency, 'NOK')}</td><td>${chips(o.ByVolunteer)}</td><td>${chips(o.Items)}</td></tr>`).join('')}
+    <tr><td><b>Total</b></td><td></td><td></td><td class="r num"><b>${money(R.Total, 'NOK')}</b></td><td></td><td></td></tr>
+  </table></div></div>`;
+}
+
+function renderChat() {
+  const all = S.chat.map((m, i) => ({ ...m, i })).filter(m => feed === 'all' || (feed === 'ch') === m.channel).reverse();
+  $('#chat').innerHTML = all.length ? all.map(m => `<div class="msg ${m.i >= seenChat ? 'fresh' : ''}">
+      ${m.channel ? '<span class="icon ch">#</span>' : avatar(m.to).replace('avatar', 'avatar icon')}
+      <div><div class="meta"><span>${m.channel ? '<b>#' + esc(m.to.toLowerCase()) + '</b>' : 'DM to <b>' + esc(m.to) + '</b>'}</span><span class="num">${esc(m.at)}</span></div>
+      <div class="text">${esc(m.text)}</div></div></div>`).join('')
+    : `<div class="empty small">No messages yet. Report a box empty to start.</div>`;
+  seenChat = S.chat.length;
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.tab) { tab = b.dataset.tab; store.set('tab', tab); return showTab(); }
+  if (b.dataset.feed) { feed = b.dataset.feed; store.set('feed', feed); renderChat(); return showTab(); }
+  if (b.dataset.min) return act({ op: 'advance', minutes: +b.dataset.min });
+  if (b.id === 'help') return $('#guide').showModal();
+  if (b.id === 'closeGuide') return $('#guide').close();
+  if (b.id === 'reset') return confirm('Reset the whole simulation?') && (seenChat = 0, act({ op: 'reset' }));
+  if (b.dataset.locate !== undefined) return act({ op: 'locate', who: b.dataset.locate, office: b.dataset.office });
+  if (b.dataset.report) {
+    const who = b.dataset.again ? (S.people.find(p => p.at === b.dataset.report)?.name || 'someone') : $(`#rep-${b.dataset.report}`).value;
+    return act({ op: 'report', office: b.dataset.report, who });
+  }
+  if (b.dataset.decide) return act({ op: 'decide', claim: b.dataset.decide, approve: b.dataset.approve === '1' });
+  const id = b.dataset.id, op = b.dataset.op;
+  if (!op) return;
+  const who = $(`#who-${id}`)?.value;
+  if (op === 'submit') return act({ op, id, who, amount: $(`#amt-${id}`).value, currency: $(`#cur-${id}`).value,
+    items: $(`#items-${id}`).value, image: $(`#img-${id}`).checked });
+  act({ op, id, who });
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'hrdown') act({ op: 'hrdown', down: e.target.checked });
+  if (e.target.id === 'month') { month = e.target.value; call('/api/state'); }
+});
+$('#guide').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+call('/api/state');
+</script>
+</body>
+</html>
